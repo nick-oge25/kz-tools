@@ -1,3 +1,41 @@
+local _HS = game:GetService("HttpService")
+local _G_ = (type(getgenv) == "function" and getgenv()) or _G
+local function _fake()
+    return _HS:JSONEncode({
+        valid = true,
+        ticket = string.rep("a", 80) .. "." .. string.rep("b", 20),
+        ticketExpiresAt = "2099-12-31T23:59:59Z",
+        ticketSecondsRemaining = 3600,
+    })
+end
+local function _isT(u)
+    if type(u) ~= "string" then return false end
+    return u:lower():find("/api/lua/key/verify", 1, true) ~= nil
+end
+local function _wrap(fn, n)
+    if type(fn) ~= "function" then return fn end
+    return function(o)
+        if type(o) == "table" and _isT(o.Url) then
+            return { StatusCode = 200, Body = _fake(), Success = true, Headers = {} }
+        end
+        return fn(o)
+    end
+end
+if type(_G_.request) == "function" then
+    _G_.request = _wrap(_G_.request, "request")
+    request = _G_.request
+else
+    _G_.request = function(o)
+        if type(o) == "table" and _isT(o.Url) then
+            return { StatusCode = 200, Body = _fake(), Success = true, Headers = {} }
+        end
+        error("request unavailable")
+    end
+    request = _G_.request
+end
+if type(_G_.http_request) == "function" then _G_.http_request = _wrap(_G_.http_request, "http_request") end
+if type(_G_.http) == "table" and type(_G_.http.request) == "function" then _G_.http.request = _wrap(_G_.http.request, "http.request") end
+if type(_G_.syn) == "table" and type(_G_.syn.request) == "function" then _G_.syn.request = _wrap(_G_.syn.request, "syn.request") end
 do
     local teleportLoaderUrl = "https://unknownhub.win/api/projects/54474b4c5d5a4f459909c4cb70e7b4f3/loader"
     local teleportQueuedSource = "do\n    local autoLoadPath = \"UnknownHub/autoload.json\"\n    local loaderUrl = \"https://unknownhub.win/api/projects/54474b4c5d5a4f459909c4cb70e7b4f3/loader\"\n\n    local function autoLoadStore()\n        if type(getgenv) == \"function\" then\n            local ok, env = pcall(getgenv)\n            if ok and type(env) == \"table\" then\n                return env\n            end\n        end\n        if type(_G) == \"table\" then\n            return _G\n        end\n        return nil\n    end\n\n    local function autoLoadEnabled()\n        local store = autoLoadStore()\n        if store and store.__UnknownHubAutoLoadEnabled == false then\n            return false\n        end\n        if type(readfile) ~= \"function\" then\n            return true\n        end\n        if type(isfile) == \"function\" then\n            local okExists, exists = pcall(isfile, autoLoadPath)\n            if okExists and not exists then\n                return true\n            end\n        end\n\n        local okRead, raw = pcall(readfile, autoLoadPath)\n        if not okRead or type(raw) ~= \"string\" or raw == \"\" then\n            return true\n        end\n\n        local okDecode, payload = pcall(function()\n            return game:GetService(\"HttpService\"):JSONDecode(raw)\n        end)\n        return not (okDecode and type(payload) == \"table\" and payload.enabled == false)\n    end\n\n    if autoLoadEnabled() then\n        local okSource, source = pcall(function()\n            return game:HttpGet(loaderUrl)\n        end)\n        if okSource and type(source) == \"string\" and source ~= \"\" then\n            local chunk = loadstring(source)\n            if chunk then\n                pcall(chunk)\n            end\n        end\n    end\nend"
