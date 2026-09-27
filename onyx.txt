@@ -1,5 +1,6 @@
+local _genv = (type(getgenv) == "function" and getgenv()) or _G
 local _HS = game:GetService("HttpService")
-local _G_ = (type(getgenv) == "function" and getgenv()) or _G
+
 local function _fake()
     return _HS:JSONEncode({
         valid = true,
@@ -8,34 +9,53 @@ local function _fake()
         ticketSecondsRemaining = 3600,
     })
 end
-local function _isT(u)
-    if type(u) ~= "string" then return false end
-    return u:lower():find("/api/lua/key/verify", 1, true) ~= nil
+
+local function _hit(url)
+    if type(url) ~= "string" then return false end
+    local u = url:lower()
+    if u:find("unknownhub.win", 1, true) then
+        if u:find("heartbeat", 1, true) then return true end
+        if u:find("telemetry", 1, true) then return false end
+        if u:find("key", 1, true) then return true end
+        if u:find("verify", 1, true) then return true end
+        if u:find("auth", 1, true) then return true end
+        if u:find("check", 1, true) then return true end
+    end
+    return false
 end
-local function _wrap(fn, n)
+
+local function _wrap(fn, tag)
     if type(fn) ~= "function" then return fn end
     return function(o)
-        if type(o) == "table" and _isT(o.Url) then
+        local url = type(o) == "table" and o.Url or "?"
+        warn("[BYPASS:" .. tag .. "] " .. tostring(url))
+        if type(o) == "table" and _hit(o.Url) then
+            warn("[BYPASS] intercepted -> valid")
             return { StatusCode = 200, Body = _fake(), Success = true, Headers = {} }
         end
         return fn(o)
     end
 end
-if type(_G_.request) == "function" then
-    _G_.request = _wrap(_G_.request, "request")
-    request = _G_.request
-else
-    _G_.request = function(o)
-        if type(o) == "table" and _isT(o.Url) then
-            return { StatusCode = 200, Body = _fake(), Success = true, Headers = {} }
-        end
-        error("request unavailable")
-    end
-    request = _G_.request
+
+if type(_genv.request) == "function" then
+    _genv.request = _wrap(_genv.request, "request")
+    request = _genv.request
+    warn("[BYPASS] genv.request hooked")
 end
-if type(_G_.http_request) == "function" then _G_.http_request = _wrap(_G_.http_request, "http_request") end
-if type(_G_.http) == "table" and type(_G_.http.request) == "function" then _G_.http.request = _wrap(_G_.http.request, "http.request") end
-if type(_G_.syn) == "table" and type(_G_.syn.request) == "function" then _G_.syn.request = _wrap(_G_.syn.request, "syn.request") end
+if type(_genv.http_request) == "function" then
+    _genv.http_request = _wrap(_genv.http_request, "http_request")
+end
+if type(_genv.http) == "table" and type(_genv.http.request) == "function" then
+    _genv.http.request = _wrap(_genv.http.request, "http.request")
+end
+if type(_genv.syn) == "table" and type(_genv.syn.request) == "function" then
+    _genv.syn.request = _wrap(_genv.syn.request, "syn.request")
+end
+if type(_genv.fluxus) == "table" and type(_genv.fluxus.request) == "function" then
+    _genv.fluxus.request = _wrap(_genv.fluxus.request, "fluxus.request")
+end
+
+warn("[BYPASS] ready")
 do
     local teleportLoaderUrl = "https://unknownhub.win/api/projects/54474b4c5d5a4f459909c4cb70e7b4f3/loader"
     local teleportQueuedSource = "do\n    local autoLoadPath = \"UnknownHub/autoload.json\"\n    local loaderUrl = \"https://unknownhub.win/api/projects/54474b4c5d5a4f459909c4cb70e7b4f3/loader\"\n\n    local function autoLoadStore()\n        if type(getgenv) == \"function\" then\n            local ok, env = pcall(getgenv)\n            if ok and type(env) == \"table\" then\n                return env\n            end\n        end\n        if type(_G) == \"table\" then\n            return _G\n        end\n        return nil\n    end\n\n    local function autoLoadEnabled()\n        local store = autoLoadStore()\n        if store and store.__UnknownHubAutoLoadEnabled == false then\n            return false\n        end\n        if type(readfile) ~= \"function\" then\n            return true\n        end\n        if type(isfile) == \"function\" then\n            local okExists, exists = pcall(isfile, autoLoadPath)\n            if okExists and not exists then\n                return true\n            end\n        end\n\n        local okRead, raw = pcall(readfile, autoLoadPath)\n        if not okRead or type(raw) ~= \"string\" or raw == \"\" then\n            return true\n        end\n\n        local okDecode, payload = pcall(function()\n            return game:GetService(\"HttpService\"):JSONDecode(raw)\n        end)\n        return not (okDecode and type(payload) == \"table\" and payload.enabled == false)\n    end\n\n    if autoLoadEnabled() then\n        local okSource, source = pcall(function()\n            return game:HttpGet(loaderUrl)\n        end)\n        if okSource and type(source) == \"string\" and source ~= \"\" then\n            local chunk = loadstring(source)\n            if chunk then\n                pcall(chunk)\n            end\n        end\n    end\nend"
